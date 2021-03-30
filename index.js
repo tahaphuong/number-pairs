@@ -1,4 +1,7 @@
 const BLANK_CODE = 0
+
+
+// data of a ceil
 class CeilSchema {
   ceilNum;
   ceilId;
@@ -15,6 +18,7 @@ class CeilSchema {
   }
 }
 
+// ceil component of the board ------------------------------------------------
 let appCeil = Vue.component('app-ceil', {
   props: {
     ceil: CeilSchema
@@ -31,9 +35,9 @@ let appCeil = Vue.component('app-ceil', {
   {{this.ceil.ceilNum == 0 ? "" : this.ceil.ceilNum}}</div>`
 })
 
-
+// board component ------------------------------------------------
 let appBoard = Vue.component('app-board', {
-  props: ['height', 'width', 'renderedBoard'],
+  props: ["height", "width", "renderedBoard", "winGame"],
   data: function() {
     return {
       id: 'app-board',
@@ -49,9 +53,9 @@ let appBoard = Vue.component('app-board', {
     x.style.gridTemplateRows = `repeat(${this.height +2}, 40px)`
     x.style.gridTemplateColumns = `repeat(${this.width +2}, 40px)`
   },
-  updated: function() {
+  // updated: function() {
     // console.log('this board updated', this.board)
-  },
+  // },
   methods: {
     handleChoose: function(ceil) {
       if (ceil.ceilNum == BLANK_CODE) {
@@ -71,6 +75,20 @@ let appBoard = Vue.component('app-board', {
         }
         this.handleCancelChoose()
       }
+
+      // check if the player win
+      let check = true
+      for (let c of this.renderedBoard) {
+        if (c.ceilNum != 0) {
+          check = false
+          break
+        }
+      }
+
+      if (check) {
+        this.winGame()
+      }
+      
     },
     handleCancelChoose: function() {
       this.choosing.chosen = false
@@ -79,26 +97,36 @@ let appBoard = Vue.component('app-board', {
   },
   template: `
   <div :id="this.id">
-    <app-ceil v-on:choose="handleChoose" v-for="ceil in renderedBoard" :ceil="ceil" :key="ceil.ceilId"></app-ceil>
+    <app-ceil @choose="handleChoose" v-for="ceil in renderedBoard" :ceil="ceil" :key="ceil.ceilId"></app-ceil>
   </div>
   `
 })
-// <app-ceil v-on:choose="handleChoose" v-for="ceil in row" :ceil="ceil">12</app-ceil>
+
+// main app component. Global variables are processed here. ------------------------------------------------
 Vue.component('my-app', {
   data: function() {
     return {
+      STOPPED: 0,
+      STARTED: 1,
+      PAUSED: 2,
+      fastestTime: localStorage.getItem("fastestTime"),
+
       id: "app",
       height: 5,
       width: 8,
       board: [],
-      renderedBoard: []
+      renderedBoard: [],
+      currentInterval: null,
+      startTime: 0,
+      currentTime: null,
+      state: 0 // this.stop
     }
   },
   components: {
     appBoard: appBoard
   },
-  created: function() {
-  },
+  // created: function() {
+  // },
   methods: {
     loadArray: function() {
       for (let i=0; i <= this.height+1; i++) {
@@ -140,15 +168,56 @@ Vue.component('my-app', {
         }
       }
     },
+    startGame: function() {
+      this.state = this.STARTED
+      this.loadArray()
+      this.renderArray()
+
+      this.startTime = new Date().getTime()/1000
+
+      this.currentInterval = setInterval(function() {
+        this.currentTime = parseInt(new Date().getTime()/1000 - this.startTime)
+        console.log(this.currentTime)
+      }.bind(this), 1000)
+    },
+    stopGame: function() {
+      this.state = this.STOPPED
+      clearInterval(this.currentInterval)
+
+      this.board = []
+      this.renderedBoard = []
+    },
+    winGame: function() {
+      this.state = this.STOPPED
+      clearInterval(this.currentInterval)
+
+      setTimeout(function() {
+        this.fastestTime = this.currentTime
+        localStorage.setItem("fastestTime", this.currentTime)
+        alert("You won this game in " + this.currentTime + " seconds.")
+
+        this.startTime = 0
+        this.currentTime = null
+      }.bind(this), 500)
+    },
+    pauseGame: function() {},
   },
   template: `
     <div :id="this.id">
-			<app-board v-on:matched="renderArray" :height="height" :width="width" :rendered-board="renderedBoard"></app-board>
-			<button v-on:click.prevent="loadArray(); renderArray();">click me</button>
+			<app-board @matched="renderArray" :winGame="winGame" :height="height" :width="width" :rendered-board="renderedBoard"></app-board>
+      <div v-if="state == STARTED">Time: {{ currentTime || 0 }}s </div>
+      <button v-if="state == STOPPED" @click.prevent="startGame">Start</button>
+      <button v-if="state == STARTED" @click.prevent="stopGame">Stop game</button>
+      <button v-if="state == STARTED" @click.prevent="startGame">Play again</button>
+
+      <div>Fastest time: {{fastestTime ? fastestTime + "s" : "Not yet recorded"}} </div>
+
 		</div>
   `
 })
 
+// wrapper for the app, 
+// because Vue component cant link directly to DOM (03/2021)
 new Vue({
   el: '#wrap'
 }) 
