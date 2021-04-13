@@ -1,7 +1,7 @@
 const BLANK_CODE = 0
 
 
-// data of a ceil
+// ceil object
 class CeilSchema {
   ceilNum;
   ceilId;
@@ -9,8 +9,7 @@ class CeilSchema {
   col;
   chosen;
   constructor(randomNumber, row, col) {
-    let code = Math.ceil(randomNumber / 2)
-    this.ceilNum = code
+    this.ceilNum = Math.ceil(randomNumber / 2)
     this.ceilId = row + "-" + col
     this.row = row
     this.col = col
@@ -18,65 +17,82 @@ class CeilSchema {
   }
 }
 
+
+
+
+
 // ceil component of the board ------------------------------------------------
-let appCeil = Vue.component('app-ceil', {
+let appCeil = Vue.component('app-ceil', 
+{
   props: {
     ceil: CeilSchema
   },
   methods: {
-    choose: function() {
+    choose() {
       this.$emit('choose', this.ceil)
     }, 
-    updated: function() {
-      console.log('ceil updated')
-    }
   },
-  template: `<div @click="choose" class="app-ceil" :class="{'chosen-ceil': ceil.chosen, 'no-opacity': this.ceil.ceilNum == 0}">
-  {{this.ceil.ceilNum == 0 ? "" : this.ceil.ceilNum}}</div>`
+  template: `
+    <div 
+      @click = "choose" 
+      :class =
+      "{
+        'app-ceil': true,
+        'chosen-ceil': ceil.chosen, 
+        'no-opacity': ceil.ceilNum == 0
+      }"
+    >
+    {{ ceil.ceilNum == 0 ? "" : ceil.ceilNum}}
+    </div>`
 })
 
 // board component ------------------------------------------------
-let appBoard = Vue.component('app-board', {
-  props: ["height", "width", "renderedBoard", "winGame"],
-  data: function() {
+let appBoard = Vue.component('app-board', 
+{
+  props: ['height', 'width', 'renderedBoard', 'winGame'],
+  data() {
     return {
       id: 'app-board',
-      choosing: null
+      chosenCeil: null
     }
   },
   components: {
-    appCeil: appCeil
+    appCeil
   },
-  mounted: function() {
+  mounted() {
     let x = document.getElementById(this.id)
     x.style.display = 'grid'
     x.style.gridTemplateRows = `repeat(${this.height +2}, 40px)`
     x.style.gridTemplateColumns = `repeat(${this.width +2}, 40px)`
   },
-  // updated: function() {
-    // console.log('this board updated', this.board)
-  // },
   methods: {
-    handleChoose: function(ceil) {
-      if (ceil.ceilNum == BLANK_CODE) {
-        if (this.choosing != null) {
-          this.handleCancelChoose()
+    handleChoose(ceil) {
+      
+      // when no ceil is chosen
+      if (this.chosenCeil == null && ceil.ceilNum != BLANK_CODE) {
+        this.chosenCeil = ceil
+        this.chosenCeil.chosen = true
+      } 
+      // when 1 ceil is chosen
+      else {
+        // when ceils match -> delete 2 ceils
+        if (
+          this.chosenCeil != null && 
+          this.chosenCeil.ceilNum == ceil.ceilNum &&
+          this.chosenCeil.ceilId != ceil.ceilId
+        ) {  
+          ceil.ceilNum = BLANK_CODE
+          this.chosenCeil.ceilNum = BLANK_CODE
         }
-      } else if (this.choosing == null) {
-        ceil.chosen = true
-        this.choosing = ceil
-      } else if (this.choosing.ceilId == ceil.ceilId) {
-        this.handleCancelChoose()
-      } else {
-        if (this.choosing.ceilNum == ceil.ceilNum) {
-          ceil.chosen = true
-          this.choosing.ceilNum = 0
-          ceil.ceilNum = 0
-        }
-        this.handleCancelChoose()
-      }
 
-      // check if the player win
+        // finally cancel choosing ceil
+        this.chosenCeil.chosen = false
+        this.chosenCeil = null
+      }
+      this.checkWinGame()
+
+    },
+    checkWinGame() {
       let check = true
       for (let c of this.renderedBoard) {
         if (c.ceilNum != 0) {
@@ -88,23 +104,24 @@ let appBoard = Vue.component('app-board', {
       if (check) {
         this.winGame()
       }
-      
-    },
-    handleCancelChoose: function() {
-      this.choosing.chosen = false
-      this.choosing = null
     }
   },
   template: `
-  <div :id="this.id">
-    <app-ceil @choose="handleChoose" v-for="ceil in renderedBoard" :ceil="ceil" :key="ceil.ceilId"></app-ceil>
+  <div :id = "this.id">
+    <app-ceil 
+      @choose = "handleChoose" 
+      v-for = "ceil in renderedBoard" 
+      :ceil = "ceil" 
+      :key = "ceil.ceilId"
+    >
+    </app-ceil>
   </div>
   `
 })
 
 // main app component. Global variables are processed here. ------------------------------------------------
 Vue.component('my-app', {
-  data: function() {
+  data() {
     return {
       STOPPED: 0,
       STARTED: 1,
@@ -125,10 +142,10 @@ Vue.component('my-app', {
   components: {
     appBoard: appBoard
   },
-  // created: function() {
+  // created() {
   // },
   methods: {
-    loadArray: function() {
+    loadArray() {
       for (let i=0; i <= this.height+1; i++) {
         let row = []
         for (let j=0; j <= this.width+1; j++) {
@@ -160,7 +177,7 @@ Vue.component('my-app', {
       }
       console.table(this.board)
     },
-    renderArray: function() {
+    renderArray() {
       this.renderedBoard = []
       for (let i=0; i <= this.height+1; i++) {
         for (let j=0; j <= this.width+1; j++) {
@@ -168,26 +185,29 @@ Vue.component('my-app', {
         }
       }
     },
-    startGame: function() {
+    startGame() {
       this.state = this.STARTED
       this.loadArray()
       this.renderArray()
 
       this.startTime = new Date().getTime()/1000
 
-      this.currentInterval = setInterval(function() {
-        this.currentTime = parseInt(new Date().getTime()/1000 - this.startTime)
-        console.log(this.currentTime)
-      }.bind(this), 1000)
+      this.currentInterval = 
+      setInterval(
+        function() {
+          this.currentTime = parseInt(new Date().getTime()/1000 - this.startTime)
+          console.log(this.currentTime)
+        }
+      .bind(this), 1000)
     },
-    stopGame: function() {
+    stopGame() {
       this.state = this.STOPPED
       clearInterval(this.currentInterval)
 
       this.board = []
       this.renderedBoard = []
     },
-    winGame: function() {
+    winGame() {
       this.state = this.STOPPED
       clearInterval(this.currentInterval)
 
@@ -200,7 +220,7 @@ Vue.component('my-app', {
         this.currentTime = null
       }.bind(this), 500)
     },
-    pauseGame: function() {},
+    pauseGame() {},
   },
   template: `
     <div :id="this.id">
